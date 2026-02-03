@@ -1,13 +1,30 @@
-import sys
+import base64
 from pathlib import Path
 
-# プロジェクトルートをパスに追加
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+import streamlit as st
+import pandas as pd
 
-import streamlit as st  # noqa: E402
-import pandas as pd  # noqa: E402
-from src.utils.config import load_workspace_config  # noqa: E402
+# プロジェクトルート
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def image_to_base64(path: str) -> str | None:
+    """画像をbase64エンコードしたdata URIに変換"""
+    p = Path(path)
+    if not p.exists():
+        return None
+    suffix = p.suffix.lower()
+    mime_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".bmp": "image/bmp",
+    }
+    mime = mime_types.get(suffix, "image/png")
+    with open(p, "rb") as f:
+        data = base64.b64encode(f.read()).decode()
+    return f"data:{mime};base64,{data}"
 
 
 def get_workspaces() -> list[str]:
@@ -38,6 +55,22 @@ def main():
         layout="wide",
     )
 
+    # 余白を調整するCSS
+    st.markdown(
+        """
+        <style>
+        header[data-testid="stHeader"] {
+            display: none;
+        }
+        .stMainBlockContainer {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.title("Validation Results Viewer")
 
     # ワークスペース選択
@@ -51,23 +84,9 @@ def main():
     selected_workspace = st.selectbox("ワークスペース", workspaces)
     workspace_path = PROJECT_ROOT / "workspace" / selected_workspace
 
-    # 設定とCSV読み込み
-    config_path = workspace_path / "config.json"
+    # CSV読み込み
     csv_path = workspace_path / "validation_results.csv"
-
-    if not config_path.exists():
-        st.error(f"設定ファイルが見つかりません: {config_path}")
-        return
-
-    config = load_workspace_config(config_path)
-    base_image_width = config.dataset.image_size[1]  # (H, W) の W
-
     df = pd.read_csv(csv_path)
-
-    # 表示設定
-    st.sidebar.header("表示設定")
-    image_scale = st.sidebar.slider("画像スケール", 0.5, 5.0, 1.0, 0.5)
-    image_width = int(base_image_width * image_scale)
 
     # フィルタリング
     st.sidebar.header("フィルター")
@@ -122,77 +141,63 @@ def main():
     col3.metric("Wrong", wrong)
     col4.metric("Accuracy", f"{accuracy:.2f}%")
 
-    st.divider()
-
     # ページネーション
     items_per_page = st.sidebar.slider("表示件数", 10, 100, 20, 10)
-    total_pages = (len(filtered_df) + items_per_page - 1) // items_per_page
-
-    if total_pages > 0:
-        page = st.sidebar.number_input("ページ", 1, total_pages, 1)
-    else:
-        page = 1
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = st.sidebar.number_input("ページ", 1, total_pages, 1)
 
     start_idx = (page - 1) * items_per_page
-    end_idx = min(start_idx + items_per_page, len(filtered_df))
-    page_df = filtered_df.iloc[start_idx:end_idx]
+    end_idx = min(start_idx + items_per_page, total)
 
     st.caption(f"{start_idx + 1} - {end_idx} / {total} 件")
 
-    # テーブルヘッダー
-    header_cols = st.columns([2, 2, 1, 1, 1, 1, 1])
-    header_cols[0].markdown("**File Name**")
-    header_cols[1].markdown("**Source Image**")
-    header_cols[2].markdown("**True Label**")
-    header_cols[3].markdown("**Predicted Label**")
-    header_cols[4].markdown("**Dataset Type**")
-    header_cols[5].markdown("**Confidence**")
-    header_cols[6].markdown("**Result**")
+    # 表示するページ分のみ処理
+    page_df = filtered_df.iloc[start_idx:end_idx].copy()
 
-    st.divider()
+    # ファイル名を抽出
+    page_df["File Name"] = page_df["Image Path"].apply(lambda x: Path(x).name)
 
-    # テーブル行
-    for _, row in page_df.iterrows():
-        cols = st.columns([2, 2, 1, 1, 1, 1, 1])
+    # 画像をbase64エンコード（表示分のみ）
+    page_df["Image"] = page_df["Image Path"].apply(
+        lambda x: image_to_base64(str(PROJECT_ROOT / x))
+    )
 
-        # File Name
-        file_name = Path(row["Image Path"]).name
-        cols[0].text(file_name)
+    # ラベルに文字を追加
+    page_df["True"] = page_df["True Label"].apply(lambda x: f"{label_to_char(x)} ({x})")
+    page_df["Predicted"] = page_df["Predicted Label"].apply(
+        lambda x: f"{label_to_char(x)} ({x})"
+    )
 
-        # Source Image
-        source_path = PROJECT_ROOT / row["Image Path"]
-        if source_path.exists():
-            cols[1].image(source_path, width=image_width)
-        else:
-            cols[1].text("Not found")
+    # 表示用カラム選択
+    display_df = page_df[
+        [
+            "File Name",
+            "Image",
+            "True",
+            "Predicted",
+            "Dataset Type",
+            "Confidence",
+            "Result",
+        ]
+    ]
 
-        # True Label (ラベル + 文字)
-        true_char = label_to_char(row["True Label"])
-        cols[2].markdown(
-            f'<span style="font-size:50px">{true_char}</span><br><code>{row["True Label"]}</code>',
-            unsafe_allow_html=True,
-        )
-
-        # Predicted Label (ラベル + 文字)
-        pred_char = label_to_char(row["Predicted Label"])
-        cols[3].markdown(
-            f'<span style="font-size:50px">{pred_char}</span><br><code>{row["Predicted Label"]}</code>',
-            unsafe_allow_html=True,
-        )
-
-        # Dataset Type
-        cols[4].text(row["Dataset Type"])
-
-        # Confidence
-        cols[5].text(f"{row['Confidence']:.4f}")
-
-        # Result
-        if row["Result"] == "CORRECT":
-            cols[6].success(row["Result"])
-        else:
-            cols[6].error(row["Result"])
-
-        st.divider()
+    # データフレーム表示
+    st.dataframe(
+        display_df,
+        column_config={
+            "File Name": st.column_config.TextColumn("File Name", width="medium"),
+            "Image": st.column_config.ImageColumn("Source Image", width="medium"),
+            "True": st.column_config.TextColumn("True Label", width="small"),
+            "Predicted": st.column_config.TextColumn("Predicted Label", width="small"),
+            "Dataset Type": st.column_config.TextColumn("Dataset Type", width="small"),
+            "Confidence": st.column_config.NumberColumn(
+                "Confidence", format="%.4f", width="small"
+            ),
+            "Result": st.column_config.TextColumn("Result", width="small"),
+        },
+        hide_index=True,
+        width="stretch",
+    )
 
 
 if __name__ == "__main__":
