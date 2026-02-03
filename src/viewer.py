@@ -5,9 +5,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import streamlit as st
-import pandas as pd
-from src.utils.config import load_workspace_config
+import streamlit as st  # noqa: E402
+import pandas as pd  # noqa: E402
+from src.utils.config import load_workspace_config  # noqa: E402
 
 
 def get_workspaces() -> list[str]:
@@ -43,7 +43,9 @@ def main():
     # ワークスペース選択
     workspaces = get_workspaces()
     if not workspaces:
-        st.error("ワークスペースが見つかりません。validation_results.csvを含むワークスペースを作成してください。")
+        st.error(
+            "ワークスペースが見つかりません。validation_results.csvを含むワークスペースを作成してください。"
+        )
         return
 
     selected_workspace = st.selectbox("ワークスペース", workspaces)
