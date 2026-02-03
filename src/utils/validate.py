@@ -67,7 +67,7 @@ def collect_predictions_from_files(
 
             results.append(
                 {
-                    "image_path": file_path,
+                    "image_path": Path(file_path).as_posix(),
                     "dataset_type": dataset_type,
                     "true_label": true_label,
                     "pred_label": pred_label,

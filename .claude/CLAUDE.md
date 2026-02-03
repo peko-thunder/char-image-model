@@ -17,8 +17,9 @@ char-image-model/
 │   │   └── train.py        # VGG16モデル訓練
 │   ├── efficientnetb0/
 │   │   └── train.py        # EfficientNetB0モデル訓練
-│   └── efficientnetb7/
-│       └── train.py        # EfficientNetB7モデル訓練
+│   ├── efficientnetb7/
+│   │   └── train.py        # EfficientNetB7モデル訓練
+│   └── viewer.py           # 検証結果ビューア（Streamlit）
 ├── dataset/                # 訓練データ（クラスごとのサブディレクトリ）
 └── workspace/              # 実験ワークスペース
 ```
@@ -82,6 +83,49 @@ python -m src.utils.validate workspace/exp001 -o results.csv
 
 出力:
 - `validation_results.csv` - 各画像の予測結果（画像パス、正解ラベル、予測ラベル、信頼度、結果）
+
+### 4. 検証結果の閲覧
+
+```bash
+streamlit run src/viewer.py
+```
+
+ブラウザで検証結果をテーブル表示。詳細は「検証結果ビューア」セクション参照。
+
+## 検証結果ビューア (`src/viewer.py`)
+
+Streamlitベースの検証結果閲覧ツール。
+
+### 依存関係
+
+```bash
+pip install streamlit
+```
+
+### 機能
+
+- **ワークスペース選択**: `validation_results.csv`を含むワークスペースを自動検出
+- **画像表示**: 予測対象の画像を表示（スケール調整可能）
+- **ラベル表示**: コードポイント（16進数）と実際の文字を併記
+- **統計情報**: Total / Correct / Wrong / Accuracy を表示
+- **ページネーション**: 表示件数を調整可能
+
+### フィルター機能
+
+| フィルター | 説明 |
+|-----------|------|
+| 文字検索 | 任意の文字で検索（例: `あ`）。True/Predicted Labelに一致する行を表示 |
+| Result | CORRECT / WRONG で絞り込み |
+| Dataset Type | train / val で絞り込み |
+| True Label | 正解ラベルで絞り込み |
+| Predicted Label | 予測ラベルで絞り込み |
+
+### 表示設定
+
+| 設定 | 説明 |
+|-----|------|
+| 画像スケール | 0.5〜5.0倍（デフォルト: 1.0）。config.jsonのimage_size[1]を基準 |
+| 表示件数 | 10〜100件（デフォルト: 20） |
 
 ## 設定クラス (`src/utils/config.py`)
 
