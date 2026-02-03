@@ -28,7 +28,7 @@ def _train(
         val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
     # Build Model
-    print("Building VGG16 model...")
+    print("Building EfficientNetB0 model...")
     model = _create_model(
         input_shape=(config.image_size[0], config.image_size[1], 3),
         num_classes=num_classes,
@@ -75,19 +75,21 @@ def _create_model(
     use_augmentation: bool = True,
 ) -> keras.Model:
     """
-    Creates a VGG16-based model for image classification.
+    Creates an EfficientNetB0-based model for image classification.
     Uses Transfer Learning with ImageNet weights.
+    Optimized for small images (50x50).
     """
-    # Load VGG16 base model
-    # include_top=False removes the final fully connected layers (the "head")
-    base_model = keras.applications.VGG16(
-        weights="imagenet",
+    # Load EfficientNetB0 base model
+    base_model = keras.applications.EfficientNetB0(
+        # weights="imagenet",
+        weights=None,
         include_top=False,
         input_shape=input_shape,
     )
 
-    # Freeze the base model layers to prevent updating their weights during initial training
-    base_model.trainable = False
+    # Freeze the base model layers
+    # base_model.trainable = False
+    base_model.trainable = True
 
     # Data augmentation (only active during training)
     data_augmentation = keras.Sequential(
@@ -95,7 +97,6 @@ def _create_model(
             # keras.layers.RandomRotation(0.05),  # ±18 degrees
             keras.layers.RandomZoom(0.05),  # ±5%
             # keras.layers.RandomTranslation(0.05, 0.05),  # ±5% shift
-            # keras.layers.RandomContrast(0.1),  #
         ],
         name="data_augmentation",
     )
@@ -106,8 +107,8 @@ def _create_model(
     # Apply data augmentation (automatically disabled during inference)
     x = data_augmentation(inputs) if use_augmentation else inputs
 
-    # Preprocess inputs to match VGG16 requirements (converts RGB to BGR, zero-centers)
-    x = keras.applications.vgg16.preprocess_input(x)
+    # EfficientNet has built-in preprocessing
+    x = keras.applications.efficientnet.preprocess_input(x)
 
     # Pass through the base model
     x = base_model(x, training=False)
@@ -117,19 +118,19 @@ def _create_model(
     x = keras.layers.Dropout(dropout_rate)(x)
     outputs = keras.layers.Dense(num_classes, activation="softmax")(x)
 
-    model = keras.models.Model(inputs, outputs, name="VGG16_Custom")
+    model = keras.models.Model(inputs, outputs, name="EfficientNetB0_Custom")
     return model
 
 
 def run():
     DATASET_DIR = "dataset/default"
     IMAGE_SIZE = (50, 50)
-    BATCH_SIZE = 128
+    BATCH_SIZE = 64  # B0 is lightweight, larger batch OK
     VALIDATION_SPLIT = 0.2
     SEED = 123
     EPOCHS = 100
     DROPOUT_RATE = 0.5
-    OUTPUT_DIR = "models/vgg16/tuning001"
+    OUTPUT_DIR = "models/efficientnetb0/default"
 
     # Check dataset directory
     if not os.path.exists(DATASET_DIR):
