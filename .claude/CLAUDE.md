@@ -1,8 +1,8 @@
-# VGG16 文字画像分類モデル
+# 文字画像分類モデル
 
 ## プロジェクト概要
 
-VGG16ベースの転移学習を用いた文字画像分類モデル。
+転移学習を用いた文字画像分類モデル。VGG16、EfficientNetB0、EfficientNetB7に対応。
 
 ## ディレクトリ構成
 
@@ -10,7 +10,7 @@ VGG16ベースの転移学習を用いた文字画像分類モデル。
 char-image-model/
 ├── src/
 │   ├── utils/
-│   │   ├── config.py       # 設定クラス定義（DatasetConfig, TrainingConfig）
+│   │   ├── config.py       # 設定クラス定義
 │   │   ├── dataset.py      # データセット読込
 │   │   └── validate.py     # モデル検証（共通）
 │   ├── vgg16/
@@ -20,48 +20,72 @@ char-image-model/
 │   └── efficientnetb7/
 │       └── train.py        # EfficientNetB7モデル訓練
 ├── dataset/                # 訓練データ（クラスごとのサブディレクトリ）
-└── models/                 # 保存されたモデルと設定
+└── workspace/              # 実験ワークスペース
+```
+
+## ワークスペース
+
+各実験はワークスペースディレクトリで管理する。
+
+```
+workspace/<experiment_name>/
+├── config.json             # 入力：全設定
+├── model.keras             # 出力：訓練済みモデル
+└── validation_results.csv  # 出力：検証結果
+```
+
+### config.json の構造
+
+```json
+{
+  "dataset": {
+    "dataset_dir": "dataset/default",
+    "image_size": [50, 50],
+    "batch_size": 128,
+    "validation_split": 0.2,
+    "seed": 123
+  },
+  "training": {
+    "epochs": 100,
+    "dropout_rate": 0.5
+  }
+}
 ```
 
 ## 使い方
 
-### 訓練
+### 1. ワークスペースの作成
 
 ```bash
-python -m src.vgg16.train
+mkdir -p workspace/exp001
+```
+
+`config.json`を作成して設定を記述。
+
+### 2. 訓練
+
+```bash
+python -m src.vgg16.train workspace/exp001
+python -m src.efficientnetb0.train workspace/exp001
+python -m src.efficientnetb7.train workspace/exp001
 ```
 
 出力:
-- `models/<output_dir>/model.keras` - 訓練済みモデル
-- `models/<output_dir>/dataset_config.json` - DatasetConfig
-- `models/<output_dir>/training_config.json` - TrainingConfig（epochs, dropout_rate）
+- `workspace/exp001/model.keras` - 訓練済みモデル
 
-### 検証
+### 3. 検証
 
 ```bash
-python -m src.utils.validate <model_dir> [-o output.csv]
-```
-
-引数:
-- `model_dir`: モデルディレクトリのパス（`model.keras`と`dataset_config.json`を含む）
-- `-o, --output`: 出力CSVのパス（省略時は`model_dir/validation_results.csv`）
-
-例:
-```bash
-python -m src.utils.validate models/vgg16/default
-python -m src.utils.validate models/efficientnetb0/exp1 -o results.csv
+python -m src.utils.validate workspace/exp001
+python -m src.utils.validate workspace/exp001 -o results.csv
 ```
 
 出力:
 - `validation_results.csv` - 各画像の予測結果（画像パス、正解ラベル、予測ラベル、信頼度、結果）
 
-## 主要コンポーネント
+## 設定クラス (`src/utils/config.py`)
 
-### 設定クラス (`src/utils/config.py`)
-
-#### DatasetConfig
-データセットの設定を管理するdataclass。
-
+### DatasetConfig
 ```python
 @dataclass
 class DatasetConfig:
@@ -72,9 +96,7 @@ class DatasetConfig:
     seed: Any | None                    # 乱数シード
 ```
 
-#### TrainingConfig
-トレーニングパラメータを管理するdataclass。
-
+### TrainingConfig
 ```python
 @dataclass
 class TrainingConfig:
@@ -82,22 +104,29 @@ class TrainingConfig:
     dropout_rate: float                 # ドロップアウト率
 ```
 
-#### 保存・読込
+### WorkspaceConfig
 ```python
-from src.utils.config import save_config, load_dataset_config, load_training_config
-
-save_config(config, "path/to/config.json")
-dataset_config = load_dataset_config("path/to/dataset_config.json")
-training_config = load_training_config("path/to/training_config.json")
+@dataclass
+class WorkspaceConfig:
+    dataset: DatasetConfig
+    training: TrainingConfig
 ```
 
-### モデルアーキテクチャ (`src/vgg16/train.py`)
+### 読込
+```python
+from src.utils.config import load_workspace_config
 
+config = load_workspace_config("workspace/exp001/config.json")
+```
+
+## モデルアーキテクチャ
+
+### VGG16 (`src/vgg16/train.py`)
 - **ベースモデル**: VGG16（ImageNet事前学習済み、凍結）
 - **データ拡張**: RandomZoom（訓練時のみ適用）
-- **カスタムヘッド**: GlobalAveragePooling2D → Dropout(0.2) → Dense(softmax)
+- **カスタムヘッド**: GlobalAveragePooling2D → Dropout → Dense(softmax)
 
-### 訓練設定
+### 訓練設定（共通）
 
 | パラメータ | 値 | 説明 |
 |-----------|-----|------|
@@ -137,4 +166,4 @@ for layer in base_model.layers[:-4]:
 ## 注意事項
 
 - データセットは `dataset/<name>/` 内にクラスごとのサブディレクトリで配置
-- 訓練時と検証時で同じ`DatasetConfig`を使用すること（`dataset_config.json`から読込推奨）
+- 訓練前に`config.json`を必ず作成すること

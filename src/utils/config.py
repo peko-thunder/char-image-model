@@ -19,21 +19,32 @@ class TrainingConfig:
     dropout_rate: float
 
 
-def save_config(config: DatasetConfig | TrainingConfig, path: Path | str) -> None:
-    """ConfigをJSONファイルとして保存"""
+@dataclass
+class WorkspaceConfig:
+    dataset: DatasetConfig
+    training: TrainingConfig
+
+
+def save_workspace_config(config: WorkspaceConfig, path: Path | str) -> None:
+    """WorkspaceConfigをJSONファイルとして保存"""
+    data = {
+        "dataset": asdict(config.dataset),
+        "training": asdict(config.training),
+    }
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(asdict(config), f, indent=2, ensure_ascii=False)
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def load_dataset_config(path: Path | str) -> DatasetConfig:
-    """JSONファイルからDatasetConfigを読み込み"""
+def load_workspace_config(path: Path | str) -> WorkspaceConfig:
+    """JSONファイルからWorkspaceConfigを読み込み"""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return DatasetConfig(**data)
 
+    dataset_data = data["dataset"]
+    # image_size をタプルに変換
+    dataset_data["image_size"] = tuple(dataset_data["image_size"])
 
-def load_training_config(path: Path | str) -> TrainingConfig:
-    """JSONファイルからTrainingConfigを読み込み"""
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return TrainingConfig(**data)
+    return WorkspaceConfig(
+        dataset=DatasetConfig(**dataset_data),
+        training=TrainingConfig(**data["training"]),
+    )

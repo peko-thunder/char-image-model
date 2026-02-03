@@ -10,7 +10,7 @@ import csv
 from typing import Literal, Sequence, TypedDict
 from pathlib import Path
 from src.utils.dataset import load_dataset
-from src.utils.config import load_dataset_config
+from src.utils.config import load_workspace_config
 
 
 class PredictionResult(TypedDict):
@@ -119,19 +119,19 @@ def export_predictions_to_csv(
     print(f"Done! Results saved to '{str(output)}'.")
 
 
-def validate(model_dir: str, output_path: str | None = None) -> None:
+def validate(workspace: str, output_path: str | None = None) -> None:
     """モデルを検証し、結果をCSVに出力する
 
     Args:
-        model_dir: モデルディレクトリのパス（model.kerasとconfig.jsonを含む）
-        output_path: 出力CSVのパス（省略時はmodel_dir/validation_results.csv）
+        workspace: 個別ワークスペースのパス（例: workspace/exp001）
+        output_path: 出力CSVのパス（省略時は指定ワークスペース内のvalidation_results.csv）
     """
-    model_dir_path = Path(model_dir)
-    model_path = model_dir_path / "model.keras"
-    config_path = model_dir_path / "dataset_config.json"
+    workspace_path = Path(workspace)
+    model_path = workspace_path / "model.keras"
+    config_path = workspace_path / "config.json"
 
     if output_path is None:
-        output_path = str(model_dir_path / "validation_results.csv")
+        output_path = str(workspace_path / "validation_results.csv")
 
     # 1. モデルの読み込み
     if not model_path.exists():
@@ -149,13 +149,13 @@ def validate(model_dir: str, output_path: str | None = None) -> None:
         print(f"Error: Config file '{config_path}' not found.")
         return
     print(f"Loading config from {config_path}...")
-    config = load_dataset_config(config_path)
+    config = load_workspace_config(config_path)
 
     # 3. データセットの読み込み
-    if not os.path.exists(config.dataset_dir):
-        print(f"Error: Dataset directory '{config.dataset_dir}' not found.")
+    if not os.path.exists(config.dataset.dataset_dir):
+        print(f"Error: Dataset directory '{config.dataset.dataset_dir}' not found.")
         return
-    (train_ds, val_ds) = load_dataset(config)
+    (train_ds, val_ds) = load_dataset(config.dataset)
     if not train_ds:
         return
 
@@ -171,8 +171,8 @@ def validate(model_dir: str, output_path: str | None = None) -> None:
             train_ds,
             "train",
             class_names,
-            config.image_size,
-            config.batch_size,
+            config.dataset.image_size,
+            config.dataset.batch_size,
         )
         all_predictions.extend(train_predictions)
     except Exception as e:
@@ -185,8 +185,8 @@ def validate(model_dir: str, output_path: str | None = None) -> None:
                 val_ds,
                 "val",
                 class_names,
-                config.image_size,
-                config.batch_size,
+                config.dataset.image_size,
+                config.dataset.batch_size,
             )
             all_predictions.extend(val_predictions)
         except Exception as e:
@@ -202,19 +202,19 @@ def validate(model_dir: str, output_path: str | None = None) -> None:
 def main():
     parser = argparse.ArgumentParser(description="モデルの検証を実行")
     parser.add_argument(
-        "model_dir",
+        "workspace",
         type=str,
-        help="モデルディレクトリのパス（model.kerasとconfig.jsonを含む）",
+        help="個別ワークスペースのパス（例: workspace/exp001）",
     )
     parser.add_argument(
         "-o", "--output",
         type=str,
         default=None,
-        help="出力CSVのパス（省略時はmodel_dir/validation_results.csv）",
+        help="出力CSVのパス（省略時は指定ワークスペース内のvalidation_results.csv）",
     )
     args = parser.parse_args()
 
-    validate(args.model_dir, args.output)
+    validate(args.workspace, args.output)
 
 
 if __name__ == "__main__":

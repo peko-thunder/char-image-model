@@ -2,24 +2,22 @@ import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"
 
+import argparse
 import tensorflow as tf
 import keras
 from pathlib import Path
 from src.utils.dataset import load_dataset
-from src.utils.config import DatasetConfig, TrainingConfig, save_config
+from src.utils.config import load_workspace_config
 
 
 def _train(
     dataset: tuple[tf.data.Dataset, tf.data.Dataset | None],
-    config: DatasetConfig,
+    image_size: tuple[int, int],
+    num_classes: int,
     epochs: int,
     dropout_rate: float,
 ) -> keras.Model:
     (train_ds, val_ds) = dataset
-
-    class_names = train_ds.class_names  # type: ignore
-    num_classes = len(class_names)
-    print(f"Detected classes: {class_names[:5]} and others...")
 
     # Optimize dataset performance
     AUTOTUNE = tf.data.AUTOTUNE
@@ -30,7 +28,7 @@ def _train(
     # Build Model
     print("Building EfficientNetB0 model...")
     model = _create_model(
-        input_shape=(config.image_size[0], config.image_size[1], 3),
+        input_shape=(image_size[0], image_size[1], 3),
         num_classes=num_classes,
         dropout_rate=dropout_rate,
     )
@@ -122,59 +120,58 @@ def _create_model(
     return model
 
 
-def run():
-    DATASET_DIR = "dataset/default"
-    IMAGE_SIZE = (50, 50)
-    BATCH_SIZE = 64  # B0 is lightweight, larger batch OK
-    VALIDATION_SPLIT = 0.2
-    SEED = 123
-    EPOCHS = 100
-    DROPOUT_RATE = 0.5
-    OUTPUT_DIR = "models/efficientnetb0/default"
+def run(workspace: str):
+    workspace_path = Path(workspace)
+    config_path = workspace_path / "config.json"
+
+    # Load config
+    if not config_path.exists():
+        print(f"Error: Config file '{config_path}' not found.")
+        return
+    print(f"Loading config from {config_path}...")
+    config = load_workspace_config(config_path)
 
     # Check dataset directory
-    if not os.path.exists(DATASET_DIR):
-        print(f"Error: Dataset directory '{DATASET_DIR}' not found.")
+    if not os.path.exists(config.dataset.dataset_dir):
+        print(f"Error: Dataset directory '{config.dataset.dataset_dir}' not found.")
         return
 
     print(f"TensorFlow Version: {tf.__version__}")
     print("Preparing dataset...")
 
-    config = DatasetConfig(
-        dataset_dir=DATASET_DIR,
-        image_size=IMAGE_SIZE,
-        batch_size=BATCH_SIZE,
-        validation_split=VALIDATION_SPLIT,
-        seed=SEED,
-    )
-
-    (train_ds, val_ds) = load_dataset(config)
+    (train_ds, val_ds) = load_dataset(config.dataset)
     if not train_ds:
         return
 
+    class_names = train_ds.class_names  # type: ignore
+    num_classes = len(class_names)
+    print(f"Detected classes: {class_names[:5]} and others...")
+
     model = _train(
         dataset=(train_ds, val_ds),
-        config=config,
-        epochs=EPOCHS,
-        dropout_rate=DROPOUT_RATE,
+        image_size=config.dataset.image_size,
+        num_classes=num_classes,
+        epochs=config.training.epochs,
+        dropout_rate=config.training.dropout_rate,
     )
 
     # Save Model
-    output_path = Path(OUTPUT_DIR) / "model.keras"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path = workspace_path / "model.keras"
     model.save(output_path)
     print(f"Model saved to {str(output_path)}")
 
-    # Save Configs
-    dataset_config_path = output_path.parent / "dataset_config.json"
-    save_config(config, dataset_config_path)
-    print(f"Dataset config saved to {str(dataset_config_path)}")
 
-    training_config = TrainingConfig(epochs=EPOCHS, dropout_rate=DROPOUT_RATE)
-    training_config_path = output_path.parent / "training_config.json"
-    save_config(training_config, training_config_path)
-    print(f"Training config saved to {str(training_config_path)}")
+def main():
+    parser = argparse.ArgumentParser(description="EfficientNetB0モデルの訓練を実行")
+    parser.add_argument(
+        "workspace",
+        type=str,
+        help="ワークスペースのパス（config.jsonを含む）",
+    )
+    args = parser.parse_args()
+
+    run(args.workspace)
 
 
 if __name__ == "__main__":
-    run()
+    main()
