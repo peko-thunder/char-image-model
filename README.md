@@ -6,7 +6,7 @@
 
 ```bash
 uv python install 3.12
-uv init .
+uv venv
 uv pip install \
     --upgrade pip \
     --no-cache-dir \
