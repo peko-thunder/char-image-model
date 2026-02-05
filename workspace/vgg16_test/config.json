@@ -1,0 +1,13 @@
+{
+  "dataset": {
+    "dataset_dir": "dataset/default",
+    "image_size": [50, 50],
+    "batch_size": 64,
+    "validation_split": 0.2,
+    "seed": 123
+  },
+  "training": {
+    "epochs": 100,
+    "dropout_rate": 0.5
+  }
+}
