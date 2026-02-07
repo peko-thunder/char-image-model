@@ -7,6 +7,7 @@ import tensorflow as tf
 import keras
 import numpy as np
 import csv
+import json
 from typing import Literal, Sequence, TypedDict
 from pathlib import Path
 from src.utils.dataset import load_dataset
@@ -162,6 +163,12 @@ def validate(workspace: str, output_path: str | None = None) -> None:
     class_names = train_ds.class_names  # type: ignore
     print(f"Target Classes: {class_names[:5]} and others...")
 
+    # class_namesをJSONファイルとして保存
+    class_names_path = workspace_path / "class_names.json"
+    with open(class_names_path, "w", encoding="utf-8") as f:
+        json.dump(class_names, f, ensure_ascii=False, indent=2)
+    print(f"Class names saved to {class_names_path}")
+
     # 4. 予測結果の収集（バッチ処理）
     all_predictions = []
 
@@ -207,7 +214,8 @@ def main():
         help="個別ワークスペースのパス（例: workspace/exp001）",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=str,
         default=None,
         help="出力CSVのパス（省略時は指定ワークスペース内のvalidation_results.csv）",
