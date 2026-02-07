@@ -52,6 +52,25 @@ https://kanji.jitenon.jp/
 
 ## その他参考サイト
 
-IC運転免許証に格納されたデータを紹介してみる
+### IC運転免許証に格納されたデータを紹介してみる
 
 > https://qiita.com/ikazayim/items/2e9b8bdca96db6bf34cb#%E5%A4%96%E5%AD%97
+
+### 運転免許証及び運転免許証作成システム等の仕様の改正について
+
+> https://www.npa.go.jp/laws/notification/koutuu/menkyo/menkyo20240719_145.pdf
+
+13ページ参照
+
+詳細なフォントは不明だがゴシック系のサンプルが表示
+
+> 注1 128バイトを超過する場合がある。
+> 注2 「文字構成」: 外字を構成するドット数とする。
+> (例) 50×50 : “50” 32×32 : “32”
+> 注3 外字の走査方法は、以下のとおりとする。BitMapデータをMMR符号化すること。
+
+### 人名記号外字 教育機関・公共団体版
+
+外字に使われるフォントは有料フォントの可能性もある
+
+> https://www.dynacw.co.jp/product/product_licensepackage_detail.aspx?sid=48

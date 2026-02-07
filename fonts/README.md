@@ -2,7 +2,7 @@
 
 全てのフォントの著作権は提供元に属します。
 
-| Type | Name | Styles | Url | License | File |
+| Type | Name | Styles | Url | License | Directory |
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | ゴシック | BIZ UDPGothic | 2 | https://fonts.google.com/specimen/BIZ+UDPGothic | OFL-1.1 | fonts/BIZ_UDPGothic |
 | 明朝 | IPAmj明朝 | 1 | https://moji.or.jp/mojikiban/font/ | IPA Font License | fonts/ipamjm00601 |
